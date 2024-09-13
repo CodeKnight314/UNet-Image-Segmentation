@@ -69,5 +69,5 @@ class UNet(nn.Module):
         x_up3 = self.up3(x_up2, x2_conv)
         x_up4 = self.up4(x_up3, x1_conv)
 
-        out = self.final_conv(x_up4)
+        out = torch.softmax(self.final_conv(x_up4), dim=1)
         return out

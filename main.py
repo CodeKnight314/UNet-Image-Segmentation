@@ -26,6 +26,10 @@ def Segmentation(model, optimizer, scheduler, train_dl, valid_dl, total_epochs, 
     es_mech = EarlyStopMechanism(metric_threshold=0.015, mode='min', grace_threshold=5, save_path=os.path.join(output_dir, "saved_weights"))
     logger = LOGWRITER(output_directory=output_dir, total_epochs=total_epochs)
     
+    logger.write(f"[INFO] Total Epochs: {total_epochs}")
+    logger.write(f"[INFO] Training Dataloader loaded with {len(train_dl)} batches.")
+    logger.write(f"[INFO] Validation Dataloader loaded with {len(valid_dl)} batches.")
+    
     for epoch in range(total_epochs): 
         model.train()
         total_tr_loss = 0.0

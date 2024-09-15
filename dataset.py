@@ -20,7 +20,8 @@ class SegementationDataset(Dataset):
         self.img_transform = T.Compose([
             T.ColorJitter(.1,.1,.1,.1),
             T.GaussianBlur(3, sigma=(0.1, 2.0)), 
-            T.ToTensor()
+            T.ToTensor(), 
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
         self.mask_dict = {

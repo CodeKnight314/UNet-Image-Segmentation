@@ -47,6 +47,15 @@ class SegmentationDataset(Dataset):
         ])
 
     def rgb_to_label(self, mask):
+        """
+        Converts an RGB mask image to a label map where each pixel value corresponds to a class index.
+
+        Arguements:
+            mask (PIL.Image.Image or numpy.ndarray): The input mask image in RGB format.
+
+        Returns:
+            torch.Tensor: A tensor of shape (H, W) containing class indices for each pixel.
+        """
         mask_np = np.array(mask)
         class_mask = np.zeros((mask_np.shape[0], mask_np.shape[1]), dtype=np.int64)
 

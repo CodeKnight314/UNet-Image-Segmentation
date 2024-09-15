@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 class DiceLoss(nn.Module):
     def __init__(self, smoothing: float = 1e-6, num_classes: int = 1):
@@ -15,12 +15,12 @@ class DiceLoss(nn.Module):
         """
         total_loss = 0.0
         
-        truth_one_hot = F.one_hot(truth, num_classes=self.num_classes)  
+        truth_one_hot = F.one_hot(truth, num_classes=self.num_classes) 
         truth_one_hot = truth_one_hot.permute(0, 3, 1, 2).float()
 
         for i in range(self.num_classes):
             prediction_mask_i = prediction[:, i, :, :]
-            truth_mask_i = truth[:, i, :, :]
+            truth_mask_i = truth_one_hot[:, i, :, :]
 
             prediction_mask_i = prediction_mask_i.contiguous().view(-1)
             truth_mask_i = truth_mask_i.contiguous().view(-1)
@@ -49,7 +49,7 @@ class FocalLoss(nn.Module):
         """
         N, C, H, W = prediction.shape 
         
-        prediction = prediction.permute(0, 2, 3, 1).continguous().view(-1, C)
+        prediction = prediction.permute(0, 2, 3, 1).contiguous().view(-1, C)
         truth = truth.view(-1, 1)
         
         pt = prediction[range(prediction.size(0)), truth]
@@ -73,6 +73,3 @@ class FocalLoss(nn.Module):
             return loss.sum()
         else:
             return loss
-        
-        
-        

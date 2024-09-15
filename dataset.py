@@ -56,26 +56,22 @@ class SegementationDataset(Dataset):
         img = self.img_transform(Image.open(self.img_dir[index]).convert("RGB"))
         mask = Image.open(self.mask_dir[index])
         mask = self.rgb_to_label(mask)
-        one_hot_mask = self.rgb_to_one_hot_label(mask)
         
         if random.random() < 0.5: 
             img = T.functional.hflip(img)
             mask = T.functional.hflip(mask)
-            one_hot_mask = T.functional.hflip(one_hot_mask)
             
         if random.random() < 0.5: 
             img = T.functional.vflip(img)
             mask = T.functional.vflip(mask)
-            one_hot_mask = T.functional.vflip(one_hot_mask)
 
         img_h, img_w = img.shape[1], img.shape[2]
         
         start_x, start_y = random.randint(0, img_w - self.patch_size), random.randint(0, img_h - self.patch_size)
         img = img[:, start_x:start_x + self.patch_size, start_y:start_y + self.patch_size]
         mask = mask[:, start_x:start_x + self.patch_size, start_y:start_y + self.patch_size]
-        one_hot_mask = one_hot_mask[:, start_x:start_x + self.patch_size, start_y:start_y + self.patch_size]
         
-        return img, mask, one_hot_mask
+        return img, mask
 
 def load_dataset(root_dir : str, mode : str = "train", patch_size = 256, batch_size : int = 16):
     """

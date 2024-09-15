@@ -1,6 +1,6 @@
 from model import UNet
 from loss import DiceLoss, FocalLoss
-from dataset import load_dataset
+from dataset import load_dataset, DataLoader
 from utils.early_stop import EarlyStopMechanism
 from utils.log_writer import LOGWRITER
 
@@ -15,16 +15,63 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
-def class_size(file_path):
+def class_size(file_path: str) -> int:
+    """
+    Reads the number of classes from a JSON file.
+
+    Args:
+        file_path: Path to the JSON file containing class information.
+
+    Returns:
+        The number of classes.
+    """
     with open(file_path, 'r') as file:
         class_json = json.load(file)
     return len(class_json['classes'])
 
-def denormalize_image(img, mean, std):
+def denormalize_image(img: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    """
+    Denormalizes an image given its mean and standard deviation.
+
+    Args:
+        img: The normalized image (numpy array).
+        mean: Mean values for each channel.
+        std: Standard deviation values for each channel.
+
+    Returns:
+        The denormalized image (numpy array).
+    """
     img_denorm = img * std[:, None, None] + mean[:, None, None]
     return img_denorm
 
-def Segmentation(model, optimizer, scheduler, train_dl, valid_dl, total_epochs, output_dir, device, logger, writer, es_mech):
+def Segmentation(model: nn.Module, 
+                 optimizer: opt.Optimizer, 
+                 scheduler: opt.lr_scheduler._LRScheduler, 
+                 train_dl: DataLoader,
+                 valid_dl: DataLoader, 
+                 total_epochs: int, 
+                 output_dir: str, 
+                 device: str, 
+                 logger: LOGWRITER, 
+                 writer: SummaryWriter, 
+                 es_mech: EarlyStopMechanism
+                 ) -> None:
+    """
+    Trains and evaluates a segmentation model.
+
+    Args:
+        model: The segmentation model (e.g., UNet).
+        optimizer: The optimizer for training.
+        scheduler: The learning rate scheduler.
+        train_dl: The training dataloader.
+        valid_dl: The validation dataloader.
+        total_epochs: The total number of epochs to train for.
+        output_dir: The directory to save outputs (logs, weights, visualizations).
+        device: The device to use for training (e.g., 'cuda' or 'cpu').
+        logger: The logger for recording training information.
+        writer: The TensorBoard SummaryWriter for logging metrics.
+        es_mech: The early stopping mechanism.
+    """
     criterion_diceLoss = DiceLoss(smoothing=1e-6)
     criterion_focalLoss = FocalLoss(gamma=2, reduction="mean")
     logger.write("[INFO] Loss functions instantiated.")

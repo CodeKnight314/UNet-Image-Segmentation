@@ -8,7 +8,15 @@ import random
 import numpy as np
 
 class SegmentationDataset(Dataset):
-    def __init__(self, root_dir, mode, patch_size):
+    def __init__(self, root_dir: str, mode: str, patch_size: int) -> None:
+        """
+        Initializes the SegmentationDataset.
+
+        Args:
+            root_dir (str): The root directory containing 'train' and 'val' folders with 'images' and 'masks' subdirectories.
+            mode (str): Either 'train', 'val' or 'test' to specify the dataset split.
+            patch_size (int): The size of the square patches to extract from the images.
+        """
         super().__init__()
 
         self.patch_size = patch_size
@@ -24,10 +32,10 @@ class SegmentationDataset(Dataset):
             T.ColorJitter(0.1, 0.1, 0.1, 0.1),
             T.GaussianBlur(3, sigma=(0.1, 2.0)),
             T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
 
-        # Define label mappings
+        # Define label mappings (assuming RGB color masks)
         self.mask_dict = {
             "Unlabeled": [61, 61, 61],
             "Water": [31, 89, 76],
@@ -46,12 +54,12 @@ class SegmentationDataset(Dataset):
             T.ToTensor()
         ])
 
-    def rgb_to_label(self, mask):
+    def rgb_to_label(self, mask: Image.Image) -> torch.Tensor:
         """
         Converts an RGB mask image to a label map where each pixel value corresponds to a class index.
 
-        Arguements:
-            mask (PIL.Image.Image or numpy.ndarray): The input mask image in RGB format.
+        Args:
+            mask (PIL.Image.Image): The input mask image in RGB format.
 
         Returns:
             torch.Tensor: A tensor of shape (H, W) containing class indices for each pixel.
@@ -66,10 +74,22 @@ class SegmentationDataset(Dataset):
 
         return torch.tensor(class_mask, dtype=torch.long)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """
+        Returns the total number of samples in the dataset.
+        """
         return len(self.img_dir)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Gets a sample from the dataset at the given index.
+
+        Args:
+            index (int): The index of the sample to retrieve.
+
+        Returns:
+            tuple: A tuple containing the image tensor (C, H, W) and the mask tensor (H, W).
+        """
         # Load image and mask
         img = Image.open(self.img_dir[index]).convert("RGB")
         mask = Image.open(self.mask_dir[index]).convert("RGB")
@@ -103,9 +123,18 @@ class SegmentationDataset(Dataset):
 
         return img, mask
 
-def load_dataset(root_dir: str, mode: str = "train", patch_size=256, batch_size: int = 16):
+def load_dataset(root_dir: str, mode: str = "train", patch_size: int = 256, batch_size: int = 16) -> DataLoader:
     """
-    Helper Function to load dataset for selected mode with selected patch size and batch size.
+    Loads the segmentation dataset for the specified mode.
+
+    Args:
+        root_dir (str): The root directory containing the dataset.
+        mode (str, optional): The dataset split to load ('train' or 'val'). Defaults to 'train'.
+        patch_size (int, optional): The size of the patches to extract. Defaults to 256.
+        batch_size (int, optional): The batch size for the DataLoader. Defaults to 16.
+
+    Returns:
+        DataLoader: A DataLoader for the specified dataset split.
     """
     dataset = SegmentationDataset(root_dir=root_dir, mode=mode, patch_size=patch_size)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count())

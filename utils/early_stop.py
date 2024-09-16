@@ -31,11 +31,6 @@ class EarlyStopMechanism:
             metric (float): The latest metric value to evaluate.
         """
         self.current_iteration += 1
-
-        if self.mode == 'min':
-            relative_change = (self.best_metric - metric) / self.best_metric
-        else:
-            relative_change = (metric - self.best_metric) / self.best_metric
             
         if self.best_metric > metric:
             self.best_metric = metric

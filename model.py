@@ -42,7 +42,7 @@ class UNet(nn.Module):
     def __init__(self, num_classes: int):
         super(UNet, self).__init__()
 
-        self.down1 = UNetDown(1, 64)
+        self.down1 = UNetDown(3, 64)
         self.down2 = UNetDown(64, 128)
         self.down3 = UNetDown(128, 256)
         self.down4 = UNetDown(256, 512)
@@ -69,5 +69,17 @@ class UNet(nn.Module):
         x_up3 = self.up3(x_up2, x2_conv)
         x_up4 = self.up4(x_up3, x1_conv)
 
-        out = torch.softmax(self.final_conv(x_up4), dim=1) 
+        out = self.final_conv(x_up4)
         return out
+    
+def test_forward_pass():
+    """
+    Forward Pass test to test model and verify output shape
+    """ 
+    model = UNet(num_classes=100)
+    x = torch.randn((16, 3, 256, 256), dtype=torch.float32)
+    output = model(x)
+    assert output.shape == (16, 100, 256, 256)
+
+if __name__ == "__main__": 
+    test_forward_pass()

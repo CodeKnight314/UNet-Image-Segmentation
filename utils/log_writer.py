@@ -3,7 +3,6 @@ from glob import glob
 from datetime import datetime
 
 class LOGWRITER:
-
     def __init__(self, output_directory: str, total_epochs: int):
         self.output_dir = output_directory
         self.total_epochs = total_epochs

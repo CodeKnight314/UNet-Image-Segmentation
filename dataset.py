@@ -6,6 +6,8 @@ from glob import glob
 from PIL import Image
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+import argparse
 
 class SegmentationDataset(Dataset):
     def __init__(self, root_dir: str, mode: str, patch_size: int) -> None:
@@ -138,3 +140,46 @@ def load_dataset(root_dir: str, mode: str = "train", patch_size: int = 256, batc
     """
     dataset = SegmentationDataset(root_dir=root_dir, mode=mode, patch_size=patch_size)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count())
+
+def test_dataset(root_dir: str):
+    # Color mapping for segmentation classes
+    idx_to_color_dict = {
+        0: [61, 61, 61],      # Unlabeled
+        1: [31, 89, 76],      # Water
+        2: [96, 65, 14],      # Land
+        3: [87, 35, 50],      # Road
+        4: [82, 1, 11],       # Building
+        5: [25, 46, 2],       # Vegetation
+    }
+    
+    rgb_key = torch.tensor([idx_to_color_dict[key] for key in sorted(idx_to_color_dict.keys())])
+    
+    dataset = SegmentationDataset(root_dir=root_dir)
+    
+    size = len(dataset)
+    img, mask = dataset[random.randint(0, size - 1)]
+    
+    mask_rgb = rgb_key[mask]  
+    
+    img_np = img.detach().cpu().numpy().transpose(1, 2, 0).astype('uint8')
+    mask_np = mask_rgb.detach().cpu().numpy().astype('uint8')
+    
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
+    ax[0].imshow(img_np)
+    ax[0].set_title('Image')
+    ax[0].axis('off')
+    
+    ax[1].imshow(mask_np)
+    ax[1].set_title('Mask')
+    ax[1].axis('off')
+    
+    plt.show()    
+    
+if __name__ == "__main__": 
+    parser = argparse.ArgumentParser() 
+    parser.add_argument("--root_dir", type=str, required=True, help="Root directory for dataset")
+    
+    args = parser.parse_args()
+    
+    test_dataset(args.root_dir)

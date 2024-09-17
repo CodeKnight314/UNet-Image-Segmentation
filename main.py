@@ -141,46 +141,6 @@ def Segmentation(model: nn.Module,
         writer.add_scalar('Loss/Train', avg_tr_loss, epoch+1)
         writer.add_scalar('Loss/Validation', avg_val_loss, epoch+1)
 
-        # Generate and save visualizations
-        for i, data in enumerate(valid_dl):
-            img, mask = data
-            img, mask = img.to(device), mask.to(device)
-            prediction = model(img)
-
-            img_np = img[0].cpu().numpy()
-            mask_np = mask[0].cpu().numpy()
-            prediction_np = prediction[0].cpu().detach().numpy()
-            pred_mask = np.argmax(prediction_np, axis=0)  # Shape (H, W)
-
-            img_np_denorm = denormalize_image(img_np, np.array(mean), np.array(std))
-            img_np_denorm = np.clip(img_np_denorm, 0, 1)
-
-            fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-            axes[0].imshow(np.transpose(img_np_denorm, (1, 2, 0)))
-            axes[0].set_title('Input Image')
-
-            axes[1].imshow(mask_np, cmap='gray')
-            axes[1].set_title('Ground Truth Mask')
-
-            axes[2].imshow(pred_mask, cmap='gray')
-            axes[2].set_title('Predicted Mask')
-
-            for ax in axes:
-                ax.axis('off')
-
-            writer.add_figure('Predictions', fig, global_step=epoch+1)
-
-            # Save figure to output directory
-            output_vis_dir = os.path.join(output_dir, 'visualizations')
-            os.makedirs(output_vis_dir, exist_ok=True)
-            fig.savefig(os.path.join(output_vis_dir, f'epoch_{epoch+1}_prediction.png'))
-            plt.close(fig)
-
-            logger.write(f"[INFO] Visualization saved for epoch {epoch+1}.")
-
-            break
-
     print("[INFO] Segmentation Training Job complete")
     writer.close()
 

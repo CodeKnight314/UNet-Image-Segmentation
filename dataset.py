@@ -33,18 +33,17 @@ class SegmentationDataset(Dataset):
         self.img_transform = T.Compose([
             T.ColorJitter(0.1, 0.1, 0.1, 0.1),
             T.GaussianBlur(3, sigma=(0.1, 2.0)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            T.ToTensor()
         ])
 
         # Define label mappings (assuming RGB color masks)
         self.mask_dict = {
-            "Unlabeled": [61, 61, 61],
-            "Water": [31, 89, 76],
-            "Land": [96, 65, 14],
-            "Road": [87, 35, 50],
-            "Building": [82, 1, 11],
-            "Vegetation": [25, 46, 2],
+            "Unlabeled": [155, 155, 155],
+            "Water": [226, 169, 41],
+            "Land": [132, 41, 246],
+            "Road": [110, 193, 228],
+            "Building": [60, 16, 152],
+            "Vegetation": [254, 221, 58],
         }
 
         # Map RGB values to class indices
@@ -144,25 +143,29 @@ def load_dataset(root_dir: str, mode: str = "train", patch_size: int = 256, batc
 def test_dataset(root_dir: str):
     # Color mapping for segmentation classes
     idx_to_color_dict = {
-        0: [61, 61, 61],      # Unlabeled
-        1: [31, 89, 76],      # Water
-        2: [96, 65, 14],      # Land
-        3: [87, 35, 50],      # Road
-        4: [82, 1, 11],       # Building
-        5: [25, 46, 2],       # Vegetation
+        0: [155, 155, 155],      # Unlabeled
+        1: [226, 169, 41],      # Water
+        2: [132, 41, 246],      # Land
+        3: [110, 193, 228],      # Road
+        4: [60, 16, 152],       # Building
+        5: [254, 221, 58],      # Vegetation
     }
     
     rgb_key = torch.tensor([idx_to_color_dict[key] for key in sorted(idx_to_color_dict.keys())])
     
-    dataset = SegmentationDataset(root_dir=root_dir)
+    dataset = SegmentationDataset(root_dir=root_dir, mode="train", patch_size=384)
     
     size = len(dataset)
     img, mask = dataset[random.randint(0, size - 1)]
     
-    mask_rgb = rgb_key[mask]  
+    img*=255.0
+    print(mask.min())
+    print(mask.max())
+    
+    mask = rgb_key[mask]
     
     img_np = img.detach().cpu().numpy().transpose(1, 2, 0).astype('uint8')
-    mask_np = mask_rgb.detach().cpu().numpy().astype('uint8')
+    mask_np = mask.detach().cpu().numpy().astype('uint8')
     
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
     

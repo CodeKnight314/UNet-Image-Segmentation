@@ -87,3 +87,34 @@ class FocalLoss(nn.Module):
             return loss.sum()
         else:
             return loss
+
+def test_loss_function():
+    """
+    Test the DiceLoss and FocalLoss functions with sample data.
+    """
+    num_classes = 6
+    batch_size = 16
+    height = 256
+    width = 256
+
+    prediction_logits = torch.randn(batch_size, num_classes, height, width, requires_grad=True)
+
+    prediction_probs = F.softmax(prediction_logits, dim=1)
+
+    truth = torch.randint(0, num_classes, (batch_size, height, width), dtype=torch.long)
+
+    dice_loss_fn = DiceLoss(smoothing=1e-6, num_classes=num_classes)
+    focal_loss_fn = FocalLoss(alpha=None, gamma=2.0, reduction='mean')
+
+    dice_loss_value = dice_loss_fn(prediction_probs, truth)
+
+    focal_loss_value = focal_loss_fn(prediction_logits, truth)
+
+    dice_loss_value.backward(retain_graph=True)  
+    focal_loss_value.backward()
+
+    print(f"Dice Loss: {dice_loss_value.item()}")
+    print(f"Focal Loss: {focal_loss_value.item()}")
+
+if __name__ == "__main__": 
+    test_loss_function()

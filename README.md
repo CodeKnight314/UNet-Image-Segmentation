@@ -8,18 +8,18 @@ This repository contains the implementation of UNet for Semantic Segmentation of
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/CodeKnight314/ESRGAN-pytorch.git
+    git clone https://github.com/CodeKnight314/UNet-Image-Segmentation.git
     ```
 
 2. Create and activate a virtual environment (optional but recommended):
     ```bash
-    python -m venv esrgan-env
-    source esrgan-env/bin/activate
+    python -m venv unet-env
+    source unet-env/bin/activate
     ```
 
 3. cd to project directory: 
     ```bash 
-    cd ESRGAN-pytorch/
+    cd UNet-Image-Segmentation/
     ```
 
 4. Install the required packages:

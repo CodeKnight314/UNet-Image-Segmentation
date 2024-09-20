@@ -1,5 +1,4 @@
 from model import UNet
-from loss import DiceLoss, FocalLoss
 from dataset import load_dataset, DataLoader
 from utils.early_stop import EarlyStopMechanism
 from utils.log_writer import LOGWRITER
@@ -72,9 +71,8 @@ def Segmentation(model: nn.Module,
         writer: The TensorBoard SummaryWriter for logging metrics.
         es_mech: The early stopping mechanism.
     """
-    criterion_diceLoss = DiceLoss(smoothing=1e-6)
-    criterion_focalLoss = FocalLoss(gamma=2, reduction="mean")
-    logger.write("[INFO] Loss functions instantiated.")
+    criterion = nn.CrossEntropyLoss()
+    logger.write("[INFO] CrossEntropyLoss function instantiated.")
 
     mean = [0.485, 0.456, 0.406]  
     std = [0.229, 0.224, 0.225]
@@ -95,10 +93,7 @@ def Segmentation(model: nn.Module,
             optimizer.zero_grad()
             prediction = model(img)
 
-            diceLoss_value = criterion_diceLoss(prediction, mask)
-            focalLoss = criterion_focalLoss(prediction, mask)
-
-            loss = diceLoss_value + focalLoss
+            loss = criterion(prediction, mask)
             loss.backward()
             optimizer.step()
 
@@ -115,10 +110,7 @@ def Segmentation(model: nn.Module,
 
                 prediction = model(img)
 
-                diceLoss_value = criterion_diceLoss(prediction, mask)
-                focalLoss = criterion_focalLoss(prediction, mask)
-
-                loss = diceLoss_value + focalLoss
+                loss = criterion(prediction, mask)
                 total_val_loss += loss.item()
 
         scheduler.step()

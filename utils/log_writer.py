@@ -6,6 +6,7 @@ class LOGWRITER:
     def __init__(self, output_directory: str, total_epochs: int):
         self.output_dir = output_directory
         self.total_epochs = total_epochs
+        os.makedirs(output_directory, exist_ok=True)
         log_files_count = len(glob(os.path.join(output_directory, "*.txt")))
         self.output_file_dir = os.path.join(self.output_dir, f"Log_{log_files_count}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
         self._create_log_file()

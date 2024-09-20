@@ -79,7 +79,7 @@ def main(root_dir, output_dir, train_threshold, validation_threshold, test_thres
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", type=str, required=True, help="Directory to segmentation dataset")
-    parser.add_argument("--output_dir", type=str, required=True, help="Directory to output organized dataset")
+    parser.add_argument("--output_dir", type=str, default="UNetData", help="Directory to output organized dataset")
     parser.add_argument("--threshold", type=float, nargs=3, default=[0.7, 0.2, 0.1], help="Threshold values for splitting dataset into train, validation, and test sets")
     parser.add_argument("--patch", action='store_true', help="Enable patch generation")
     parser.add_argument("--patch_size", type=int, default=256, help="Size of the patches")

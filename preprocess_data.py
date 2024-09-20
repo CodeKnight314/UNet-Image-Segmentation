@@ -3,10 +3,50 @@ from glob import glob
 import argparse
 import random
 import shutil
+from PIL import Image
+from tqdm import tqdm
 
-def main(root_dir, output_dir, train_threshold, validation_threshold, test_threshold):
+def generate_patches(image_path, mask_path, patch_size, stride):
+    # Open the image and mask
+    image = Image.open(image_path)
+    mask = Image.open(mask_path)
+
+    width, height = image.size
+
+    patches = []
+
+    # Loop over the image with the given stride
+    for y in range(0, height - patch_size + 1, stride):
+        for x in range(0, width - patch_size + 1, stride):
+            # Crop the patch from image and mask
+            image_patch = image.crop((x, y, x + patch_size, y + patch_size))
+            mask_patch = mask.crop((x, y, x + patch_size, y + patch_size))
+
+            patches.append((image_patch, mask_patch))
+
+    return patches
+
+def copy_files(image_list, mask_list, split, counters, output_dir, patch_flag=False, patch_size=256, stride=256):
+    for img, msk in zip(image_list, mask_list):
+        if patch_flag:
+            # Generate patches
+            patches = generate_patches(img, msk, patch_size, stride)
+            for img_patch, msk_patch in patches:
+                new_filename = f"{counters[split]:06d}"
+                counters[split] += 1
+
+                img_patch.save(os.path.join(output_dir, split, "images", f"{new_filename}.png"))
+                msk_patch.save(os.path.join(output_dir, split, "masks", f"{new_filename}.png"))
+        else:
+            new_filename = f"{counters[split]:06d}"
+            counters[split] += 1
+
+            shutil.copy(img, os.path.join(output_dir, split, "images", f"{new_filename}.png"))
+            shutil.copy(msk, os.path.join(output_dir, split, "masks", f"{new_filename}.png"))
+
+def main(root_dir, output_dir, train_threshold, validation_threshold, test_threshold, patch_flag=False, patch_size=256, stride=256):
     data = glob(os.path.join(root_dir, "*"))
-    
+        
     for split in ["train", "val", "test"]: 
         for labels in ["images", "masks"]: 
             path = os.path.join(output_dir, split, labels)
@@ -14,7 +54,7 @@ def main(root_dir, output_dir, train_threshold, validation_threshold, test_thres
 
     counters = {"train": 0, "val": 0, "test": 0}
 
-    for dir in data:
+    for dir in tqdm(data):
         if os.path.isdir(dir): 
             images = glob(os.path.join(dir, "images/*"))
             masks = glob(os.path.join(dir, "masks/*"))
@@ -32,24 +72,20 @@ def main(root_dir, output_dir, train_threshold, validation_threshold, test_thres
             train_images, val_images, test_images = images[:train_idx], images[train_idx:val_idx], images[val_idx:]
             train_masks, val_masks, test_masks = masks[:train_idx], masks[train_idx:val_idx], masks[val_idx:]
 
-            def copy_files(image_list, mask_list, split):
-                for img, msk in zip(image_list, mask_list):
-                    new_filename = f"{counters[split]:04d}"
-                    counters[split] += 1  
-
-                    shutil.copy(img, os.path.join(output_dir, split, "images", f"{new_filename}.png"))
-                    shutil.copy(msk, os.path.join(output_dir, split, "masks", f"{new_filename}.png"))
-
-            copy_files(train_images, train_masks, "train")
-            copy_files(val_images, val_masks, "val")
-            copy_files(test_images, test_masks, "test")
+            copy_files(train_images, train_masks, "train", counters, output_dir, patch_flag, patch_size, stride)
+            copy_files(val_images, val_masks, "val", counters, output_dir, patch_flag, patch_size, stride)
+            copy_files(test_images, test_masks, "test", counters, output_dir, patch_flag, patch_size, stride)
 
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", type=str, required=True, help="Directory to segmentation dataset")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory to output organized dataset")
     parser.add_argument("--threshold", type=float, nargs=3, default=[0.7, 0.2, 0.1], help="Threshold values for splitting dataset into train, validation, and test sets")
+    parser.add_argument("--patch", action='store_true', help="Enable patch generation")
+    parser.add_argument("--patch_size", type=int, default=256, help="Size of the patches")
+    parser.add_argument("--stride", type=int, default=256, help="Stride for patch generation")
 
     args = parser.parse_args()
-    
-    main(args.input_dir, args.output_dir, args.threshold[0], args.threshold[1], args.threshold[2])
+        
+    main(args.input_dir, args.output_dir, args.threshold[0], args.threshold[1], args.threshold[2],
+         args.patch, args.patch_size, args.stride)

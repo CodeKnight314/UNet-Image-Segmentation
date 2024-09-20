@@ -151,9 +151,9 @@ if __name__ == "__main__":
     logger = LOGWRITER(output_directory=args.output_dir, total_epochs=args.epochs)
     logger.write("[INFO] Logger instantiated.")
 
-    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=256)
+    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=256, batch_size=16)
     logger.write(f"[INFO] Training dataset loaded with {len(train_dataset)} samples.")
-    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=384)
+    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=384, batch_size=16)
     logger.write(f"[INFO] Validation dataset loaded with {len(valid_dataset)} samples.")
 
     model = UNet(class_size(os.path.join(args.root_dir, "classes.json"))).to(device)

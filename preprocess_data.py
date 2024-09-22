@@ -6,7 +6,7 @@ import shutil
 from PIL import Image
 from tqdm import tqdm
 
-def generate_patches(image_path, mask_path, patch_size, stride):
+def generate_patches(image_path: str, mask_path: str, patch_size: int, stride: int) -> list[tuple[Image.Image, Image.Image]]:
     # Open the image and mask
     image = Image.open(image_path)
     mask = Image.open(mask_path)
@@ -26,7 +26,7 @@ def generate_patches(image_path, mask_path, patch_size, stride):
 
     return patches
 
-def copy_files(image_list, mask_list, split, counters, output_dir, patch_flag=False, patch_size=256, stride=256):
+def copy_files(image_list: list[str], mask_list: list[str], split: str, counters: dict[str, int], output_dir: str, patch_flag: bool = False, patch_size: int = 256, stride: int = 256):
     for img, msk in zip(image_list, mask_list):
         if patch_flag:
             # Generate patches
@@ -44,7 +44,7 @@ def copy_files(image_list, mask_list, split, counters, output_dir, patch_flag=Fa
             shutil.copy(img, os.path.join(output_dir, split, "images", f"{new_filename}.png"))
             shutil.copy(msk, os.path.join(output_dir, split, "masks", f"{new_filename}.png"))
 
-def main(root_dir, output_dir, train_threshold, validation_threshold, test_threshold, patch_flag=False, patch_size=256, stride=256):
+def main(root_dir: str, output_dir: str, train_threshold: float, validation_threshold: float, test_threshold: float, patch_flag: bool = False, patch_size: int = 256, stride: int = 256):
     data = glob(os.path.join(root_dir, "*"))
         
     for split in ["train", "val", "test"]: 

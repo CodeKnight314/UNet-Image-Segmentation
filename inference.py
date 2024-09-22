@@ -10,7 +10,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 
-def inference(model, input_dir : str, output_dir): 
+def inference(model : torch.nn.Module, input_dir : str, output_dir : str): 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     model = model.to(device)

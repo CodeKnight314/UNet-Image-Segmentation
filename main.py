@@ -74,9 +74,6 @@ def Segmentation(model: nn.Module,
     criterion = nn.CrossEntropyLoss()
     logger.write("[INFO] CrossEntropyLoss function instantiated.")
 
-    mean = [0.485, 0.456, 0.406]  
-    std = [0.229, 0.224, 0.225]
-
     logger.write(f"[INFO] Total Epochs: {total_epochs}")
     logger.write(f"[INFO] Training Dataloader loaded with {len(train_dl)} batches.")
     logger.write(f"[INFO] Validation Dataloader loaded with {len(valid_dl)} batches.")

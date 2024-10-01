@@ -55,9 +55,3 @@ Due to the complex nature of the dataset, the segmentation model could not corre
     ```
 
 4. move classes.json into UNetData/
-
-## Training:
-Run training script:
-    ```bash
-    python UNet-Image-Segmentation/main.py --root_dir UNetData/ --output_dir UNetLogs/ --epochs 30 --lr 0.0001 --eta_min 0.000001
-    ```

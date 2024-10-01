@@ -4,6 +4,17 @@
 
 This repository contains the implementation of UNet for Semantic Segmentation of Aerial Images, classifying land, water, buildings, roads, and vegetation. The code includes training and inference scripts to generate semantic maps of input images. This repository is built for educational purposes on the implementation of UNet and its application in real-world scenarios.
 
+## Results
+
+Here are some sample results from the UNet model:
+
+<p align="center">
+  <img src="samples/000000.png" alt="Input Image" width="45%" />
+  <img src="samples/000000_mask.png" alt="Predicted Mask" width="45%" />
+</p>
+
+*Left: Input Aerial Image | Right: Predicted Segmentation Mask*
+
 ## Installation
 
 1. Clone the repository:

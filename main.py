@@ -31,16 +31,34 @@ def class_size(file_path: str) -> int:
 
 def calculate_metrics(predictions, targets, num_classes):
     """
-    Calculates additional metrics like accuracy, precision, recall, F1, and IoU.
+    Calculates metrics like accuracy, precision, recall, F1, and IoU.
 
     Args:
-        predictions: Predicted masks (batch_size, height, width).
-        targets: Ground truth masks (batch_size, height, width).
+        predictions: Predicted logits or probabilities (batch_size, num_classes, height, width).
+        targets: Ground truth class labels (batch_size, height, width).
         num_classes: Number of classes.
 
     Returns:
         A dictionary containing accuracy, precision, recall, F1-score, and IoU for each class.
     """
+    # Convert predictions to class labels
+    if predictions.dim() == 4 and predictions.size(1) == num_classes:
+        predictions = torch.argmax(predictions, dim=1)
+    elif predictions.dim() != targets.dim():
+        raise ValueError("Predictions and targets must have the same number of dimensions.")
+
+    # Ensure tensors are of integer type
+    predictions = predictions.to(torch.int64)
+    targets = targets.to(torch.int64)
+
+    # Flatten the tensors and convert to numpy arrays
+    predictions_flat = predictions.contiguous().view(-1).cpu().numpy()
+    targets_flat = targets.contiguous().view(-1).cpu().numpy()
+
+    # Ensure shapes are the same
+    if predictions_flat.shape != targets_flat.shape:
+        raise ValueError("Shape mismatch between predictions and targets after flattening.")
+
     metrics = {
         'accuracy': [],
         'precision': [],
@@ -49,25 +67,30 @@ def calculate_metrics(predictions, targets, num_classes):
         'iou': []
     }
 
-    predictions_flat = predictions.view(-1).cpu().numpy()
-    targets_flat = targets.view(-1).cpu().numpy()
-    
+    # Calculate overall accuracy
     correct = (predictions_flat == targets_flat).sum()
     total = len(targets_flat)
     accuracy = correct / total
     metrics['accuracy'].append(accuracy)
 
+    # Calculate metrics for each class
     for cls in range(num_classes):
-        precision = precision_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
-        recall = recall_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
-        f1 = f1_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
-        
+        # Binarize the predictions and targets for the current class
+        pred_binary = (predictions_flat == cls).astype(int)
+        target_binary = (targets_flat == cls).astype(int)
+
+        # Compute precision, recall, f1-score
+        precision = precision_score(target_binary, pred_binary, zero_division=0)
+        recall = recall_score(target_binary, pred_binary, zero_division=0)
+        f1 = f1_score(target_binary, pred_binary, zero_division=0)
+
         metrics['precision'].append(precision)
         metrics['recall'].append(recall)
         metrics['f1_score'].append(f1)
 
-        intersection = ((predictions_flat == cls) & (targets_flat == cls)).sum()
-        union = ((predictions_flat == cls) | (targets_flat == cls)).sum()
+        # Calculate Intersection over Union (IoU)
+        intersection = (pred_binary & target_binary).sum()
+        union = (pred_binary | target_binary).sum()
         iou = intersection / union if union != 0 else 0
         metrics['iou'].append(iou)
 
@@ -162,7 +185,7 @@ def Segmentation(model: nn.Module,
                 loss = criterion(prediction, mask)
                 total_val_loss += loss.item()
 
-                batch_metrics = calculate_metrics(prediction, mask, num_classes=model.num_classes)
+                batch_metrics = calculate_metrics(prediction, mask, num_classes=6)
                 
                 for key in val_metrics:
                     val_metrics[key].append(np.mean(batch_metrics[key]))
@@ -216,9 +239,9 @@ if __name__ == "__main__":
     logger = LOGWRITER(output_directory=args.output_dir, total_epochs=args.epochs)
     logger.write("[INFO] Logger instantiated.")
 
-    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=512, batch_size=32)
+    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=512, batch_size=8)
     logger.write(f"[INFO] Training dataset loaded with {len(train_dataset)} samples.")
-    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=512, batch_size=32)
+    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=512, batch_size=8)
     logger.write(f"[INFO] Validation dataset loaded with {len(valid_dataset)} samples.")
 
     model = UNet(class_size(os.path.join(args.root_dir, "classes.json"))).to(device)
@@ -233,7 +256,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(log_dir=os.path.join(args.output_dir, "log_outputs"))
     logger.write("[INFO] TensorBoard SummaryWriter instantiated.")
 
-    es_mech = EarlyStopMechanism(metric_threshold=0.015, mode='min', grace_threshold=5, save_path=os.path.join(args.output_dir, "saved_weights"))
+    es_mech = EarlyStopMechanism(metric_threshold=0.015, mode='min', grace_threshold=10, save_path=os.path.join(args.output_dir, "saved_weights"))
     logger.write("[INFO] EarlyStopMechanism instantiated.")
 
     Segmentation(model=model,

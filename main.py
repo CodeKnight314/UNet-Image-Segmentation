@@ -139,7 +139,19 @@ def Segmentation(model: nn.Module,
         writer: The TensorBoard SummaryWriter for logging metrics.
         es_mech: The early stopping mechanism.
     """
-    criterion = CompositeLoss().to(device)
+    
+    # Compute class frequencies
+    class_counts = torch.zeros(class_size("classes.json"))
+    for _, mask in tqdm(train_dl, desc="[Calculating Class weights]"):
+        mask = mask.view(-1)
+        class_counts += torch.bincount(mask, minlength=class_size("classes.json"))
+
+    # Compute class weights (inverse frequency)
+    class_weights = 1.0 / (class_counts + 1e-6)
+    class_weights = class_weights / class_weights.sum() * class_size("classes.json")
+    class_weights = class_weights.to(device)
+    
+    criterion = CompositeLoss(class_weights=class_weights).to(device)
     logger.write("[INFO] Composite Loss function instantiated.")
 
     logger.write(f"[INFO] Total Epochs: {total_epochs}")
@@ -175,51 +187,52 @@ def Segmentation(model: nn.Module,
         }
         
         # Validation Loop
-        with torch.no_grad():
-            for i, data in enumerate(tqdm(valid_dl, desc=f"[Validating SegModel] [{epoch+1}/{total_epochs}]")):
-                img, mask = data
-                img, mask = img.to(device), mask.to(device)
-
-                prediction = model(img)
-
-                loss = criterion(prediction, mask)
-                total_val_loss += loss.item()
-
-                batch_metrics = calculate_metrics(prediction, mask, num_classes=6)
-                
-                for key in val_metrics:
-                    val_metrics[key].append(np.mean(batch_metrics[key]))
-
-        # Average the metrics over the validation dataset
-        avg_val_loss = total_val_loss / len(valid_dl)
-        avg_val_metrics = {key: np.mean(val_metrics[key]) for key in val_metrics}
-
-        scheduler.step()
-        logger.write(f"[INFO] Scheduler step at epoch {epoch+1}.")
-
-        # Early stopping mechanism
-        es_mech.step(model=model, metric=avg_val_loss)
-        if es_mech.check():
-            logger.write("[INFO] Early Stopping Mechanism Engaged. Training procedure ended early.")
-            break
-
-        # Logging results
-        logger.log_results(epoch=epoch+1,
-                        tr_loss=total_tr_loss / len(train_dl),
-                        val_loss=avg_val_loss,
-                        accuracy=avg_val_metrics['accuracy'],
-                        precision=avg_val_metrics['precision'],
-                        recall=avg_val_metrics['recall'],
-                        f1_score=avg_val_metrics['f1_score'],
-                        iou=avg_val_metrics['iou'])
-
-        writer.add_scalar('Loss/Train', total_tr_loss / len(train_dl), epoch+1)
-        writer.add_scalar('Loss/Validation', avg_val_loss, epoch+1)
-        writer.add_scalar('Metrics/Accuracy', avg_val_metrics['accuracy'], epoch+1)
-        writer.add_scalar('Metrics/Precision', avg_val_metrics['precision'], epoch+1)
-        writer.add_scalar('Metrics/Recall', avg_val_metrics['recall'], epoch+1)
-        writer.add_scalar('Metrics/F1-Score', avg_val_metrics['f1_score'], epoch+1)
-        writer.add_scalar('Metrics/IoU', avg_val_metrics['iou'], epoch+1)
+        if(epoch % 5 == 0):
+            with torch.no_grad():
+                for i, data in enumerate(tqdm(valid_dl, desc=f"[Validating SegModel] [{epoch+1}/{total_epochs}]")):
+                    img, mask = data
+                    img, mask = img.to(device), mask.to(device)
+    
+                    prediction = model(img)
+    
+                    loss = criterion(prediction, mask)
+                    total_val_loss += loss.item()
+    
+                    batch_metrics = calculate_metrics(prediction, mask, num_classes=6)
+                    
+                    for key in val_metrics:
+                        val_metrics[key].append(np.mean(batch_metrics[key]))
+    
+            # Average the metrics over the validation dataset
+            avg_val_loss = total_val_loss / len(valid_dl)
+            avg_val_metrics = {key: np.mean(val_metrics[key]) for key in val_metrics}
+    
+            scheduler.step()
+            logger.write(f"[INFO] Scheduler step at epoch {epoch+1}.")
+    
+            # Early stopping mechanism
+            es_mech.step(model=model, metric=avg_val_loss)
+            if es_mech.check():
+                logger.write("[INFO] Early Stopping Mechanism Engaged. Training procedure ended early.")
+                break
+    
+            # Logging results
+            logger.log_results(epoch=epoch+1,
+                            tr_loss=total_tr_loss / len(train_dl),
+                            val_loss=avg_val_loss,
+                            accuracy=avg_val_metrics['accuracy'],
+                            precision=avg_val_metrics['precision'],
+                            recall=avg_val_metrics['recall'],
+                            f1_score=avg_val_metrics['f1_score'],
+                            iou=avg_val_metrics['iou'])
+    
+            writer.add_scalar('Loss/Train', total_tr_loss / len(train_dl), epoch+1)
+            writer.add_scalar('Loss/Validation', avg_val_loss, epoch+1)
+            writer.add_scalar('Metrics/Accuracy', avg_val_metrics['accuracy'], epoch+1)
+            writer.add_scalar('Metrics/Precision', avg_val_metrics['precision'], epoch+1)
+            writer.add_scalar('Metrics/Recall', avg_val_metrics['recall'], epoch+1)
+            writer.add_scalar('Metrics/F1-Score', avg_val_metrics['f1_score'], epoch+1)
+            writer.add_scalar('Metrics/IoU', avg_val_metrics['iou'], epoch+1)
 
     print("[INFO] Segmentation Training Job complete")
     writer.close()

@@ -58,18 +58,18 @@ class FocalLoss(nn.Module):
         targets = targets.view(-1)
 
         logpt = F.log_softmax(inputs, dim=-1)
-        pt = logpt.exp()
+        pt = torch.exp(logpt)
 
-        logpt = logpt[range(logpt.shape[0]), targets]
-        pt = pt[range(pt.shape[0]), targets]
+        logpt = logpt.gather(1, targets.unsqueeze(1))
+        pt = pt.gather(1, targets.unsqueeze(1))
 
         if self.alpha is not None:
             if self.alpha.device != inputs.device:
                 self.alpha = self.alpha.to(inputs.device)
-            at = self.alpha[targets]
-            logpt = logpt * at
-
-        loss = -((1 - pt) ** self.gamma) * logpt
+            at = self.alpha[targets].unsqueeze(1)
+            loss = -at * ((1 - pt) ** self.gamma) * logpt
+        else:
+            loss = -((1 - pt) ** self.gamma) * logpt
 
         if self.reduction == 'mean':
             return loss.mean()
@@ -79,16 +79,16 @@ class FocalLoss(nn.Module):
             return loss
         
 class CompositeLoss(nn.Module):
-    def __init__(self, dice_weight=0.3, focal_weight=0.3, ce_weight=0.4, 
-                 dice_smoothing=1e-6, dice_num_classes=6, focal_gamma=2.0, focal_alpha=None):
+    def __init__(self, dice_weight=0.3, focal_weight=0.3, ce_weight=1.0, 
+                 dice_smoothing=1e-6, dice_num_classes=6, focal_gamma=2.0, focal_alpha=None, class_weights=None):
         super(CompositeLoss, self).__init__()
         self.dice_weight = dice_weight
         self.focal_weight = focal_weight
         self.ce_weight = ce_weight
 
         self.dice_loss = DiceLoss(smoothing=dice_smoothing, num_classes=dice_num_classes)
-        self.focal_loss = FocalLoss(gamma=focal_gamma, alpha=focal_alpha, reduction='mean')
-        self.ce_loss = nn.CrossEntropyLoss()
+        self.focal_loss = FocalLoss(gamma=focal_gamma, alpha=class_weights, reduction='mean')
+        self.ce_loss = nn.CrossEntropyLoss(weight=class_weights)
 
     def forward(self, prediction: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
         probabilities = F.softmax(prediction, dim=1)

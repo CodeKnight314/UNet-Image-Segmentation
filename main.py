@@ -12,7 +12,7 @@ from torch import optim as opt
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 def class_size(file_path: str) -> int:
     """
@@ -27,6 +27,50 @@ def class_size(file_path: str) -> int:
     with open(file_path, 'r') as file:
         class_json = json.load(file)
     return len(class_json['classes'])
+
+def calculate_metrics(predictions, targets, num_classes):
+    """
+    Calculates additional metrics like accuracy, precision, recall, F1, and IoU.
+
+    Args:
+        predictions: Predicted masks (batch_size, height, width).
+        targets: Ground truth masks (batch_size, height, width).
+        num_classes: Number of classes.
+
+    Returns:
+        A dictionary containing accuracy, precision, recall, F1-score, and IoU for each class.
+    """
+    metrics = {
+        'accuracy': [],
+        'precision': [],
+        'recall': [],
+        'f1_score': [],
+        'iou': []
+    }
+
+    predictions_flat = predictions.view(-1).cpu().numpy()
+    targets_flat = targets.view(-1).cpu().numpy()
+    
+    correct = (predictions_flat == targets_flat).sum()
+    total = len(targets_flat)
+    accuracy = correct / total
+    metrics['accuracy'].append(accuracy)
+
+    for cls in range(num_classes):
+        precision = precision_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
+        recall = recall_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
+        f1 = f1_score(targets_flat, predictions_flat, labels=[cls], average='binary', zero_division=0)
+        
+        metrics['precision'].append(precision)
+        metrics['recall'].append(recall)
+        metrics['f1_score'].append(f1)
+
+        intersection = ((predictions_flat == cls) & (targets_flat == cls)).sum()
+        union = ((predictions_flat == cls) | (targets_flat == cls)).sum()
+        iou = intersection / union if union != 0 else 0
+        metrics['iou'].append(iou)
+
+    return metrics
 
 def denormalize_image(img: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
     """
@@ -89,7 +133,6 @@ def Segmentation(model: nn.Module,
 
             optimizer.zero_grad()
             prediction = model(img)
-            prediction = torch.argmax(prediction, dim=1)
 
             loss = criterion(prediction, mask)
             loss.backward()
@@ -99,6 +142,13 @@ def Segmentation(model: nn.Module,
 
         model.eval()
         total_val_loss = 0.0
+        val_metrics = {
+            'accuracy': [],
+            'precision': [],
+            'recall': [],
+            'f1_score': [],
+            'iou': []
+        }
         
         # Validation Loop
         with torch.no_grad():
@@ -107,16 +157,21 @@ def Segmentation(model: nn.Module,
                 img, mask = img.to(device), mask.to(device)
 
                 prediction = model(img)
-                prediction = torch.argmax(prediction, dim=1)
 
                 loss = criterion(prediction, mask)
                 total_val_loss += loss.item()
 
+                batch_metrics = calculate_metrics(prediction, mask, num_classes=model.num_classes)
+                
+                for key in val_metrics:
+                    val_metrics[key].append(np.mean(batch_metrics[key]))
+
+        # Average the metrics over the validation dataset
+        avg_val_loss = total_val_loss / len(valid_dl)
+        avg_val_metrics = {key: np.mean(val_metrics[key]) for key in val_metrics}
+
         scheduler.step()
         logger.write(f"[INFO] Scheduler step at epoch {epoch+1}.")
-
-        avg_tr_loss = total_tr_loss / len(train_dl)
-        avg_val_loss = total_val_loss / len(valid_dl)
 
         # Early stopping mechanism
         es_mech.step(model=model, metric=avg_val_loss)
@@ -126,11 +181,21 @@ def Segmentation(model: nn.Module,
 
         # Logging results
         logger.log_results(epoch=epoch+1,
-                           tr_loss=avg_tr_loss,
-                           val_loss=avg_val_loss)
+                        tr_loss=total_tr_loss / len(train_dl),
+                        val_loss=avg_val_loss,
+                        accuracy=avg_val_metrics['accuracy'],
+                        precision=avg_val_metrics['precision'],
+                        recall=avg_val_metrics['recall'],
+                        f1_score=avg_val_metrics['f1_score'],
+                        iou=avg_val_metrics['iou'])
 
-        writer.add_scalar('Loss/Train', avg_tr_loss, epoch+1)
+        writer.add_scalar('Loss/Train', total_tr_loss / len(train_dl), epoch+1)
         writer.add_scalar('Loss/Validation', avg_val_loss, epoch+1)
+        writer.add_scalar('Metrics/Accuracy', avg_val_metrics['accuracy'], epoch+1)
+        writer.add_scalar('Metrics/Precision', avg_val_metrics['precision'], epoch+1)
+        writer.add_scalar('Metrics/Recall', avg_val_metrics['recall'], epoch+1)
+        writer.add_scalar('Metrics/F1-Score', avg_val_metrics['f1_score'], epoch+1)
+        writer.add_scalar('Metrics/IoU', avg_val_metrics['iou'], epoch+1)
 
     print("[INFO] Segmentation Training Job complete")
     writer.close()
@@ -150,9 +215,9 @@ if __name__ == "__main__":
     logger = LOGWRITER(output_directory=args.output_dir, total_epochs=args.epochs)
     logger.write("[INFO] Logger instantiated.")
 
-    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=256, batch_size=16)
+    train_dataset = load_dataset(root_dir=args.root_dir, mode="train", patch_size=512, batch_size=32)
     logger.write(f"[INFO] Training dataset loaded with {len(train_dataset)} samples.")
-    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=384, batch_size=16)
+    valid_dataset = load_dataset(root_dir=args.root_dir, mode="val", patch_size=512, batch_size=32)
     logger.write(f"[INFO] Validation dataset loaded with {len(valid_dataset)} samples.")
 
     model = UNet(class_size(os.path.join(args.root_dir, "classes.json"))).to(device)
@@ -161,7 +226,7 @@ if __name__ == "__main__":
     optimizer = opt.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-3)
     logger.write("[INFO] Optimizer instantiated.")
 
-    scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=args.epochs, eta_min=args.eta_min, verbose=True)
+    scheduler = opt.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=args.epochs, eta_min=args.eta_min, verbose=False)
     logger.write("[INFO] Scheduler instantiated.")
 
     writer = SummaryWriter(log_dir=os.path.join(args.output_dir, "log_outputs"))

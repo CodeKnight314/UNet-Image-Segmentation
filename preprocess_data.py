@@ -82,8 +82,8 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default="UNetData", help="Directory to output organized dataset")
     parser.add_argument("--threshold", type=float, nargs=3, default=[0.7, 0.2, 0.1], help="Threshold values for splitting dataset into train, validation, and test sets")
     parser.add_argument("--patch", action='store_true', help="Enable patch generation")
-    parser.add_argument("--patch_size", type=int, default=256, help="Size of the patches")
-    parser.add_argument("--stride", type=int, default=256, help="Stride for patch generation")
+    parser.add_argument("--patch_size", type=int, default=512, help="Size of the patches")
+    parser.add_argument("--stride", type=int, default=128, help="Stride for patch generation")
 
     args = parser.parse_args()
         

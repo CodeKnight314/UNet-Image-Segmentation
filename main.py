@@ -89,6 +89,7 @@ def Segmentation(model: nn.Module,
 
             optimizer.zero_grad()
             prediction = model(img)
+            prediction = torch.argmax(prediction, dim=1)
 
             loss = criterion(prediction, mask)
             loss.backward()
@@ -106,6 +107,7 @@ def Segmentation(model: nn.Module,
                 img, mask = img.to(device), mask.to(device)
 
                 prediction = model(img)
+                prediction = torch.argmax(prediction, dim=1)
 
                 loss = criterion(prediction, mask)
                 total_val_loss += loss.item()

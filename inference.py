@@ -28,6 +28,7 @@ def inference(model : torch.nn.Module, input_dir : str, output_dir : str):
     }
     
     transform = T.Compose([
+        T.Resize((512,512)),
         T.ToTensor(),
         T.Normalize((0.485, 0.456, 0.406),(0.229, 0.224, 0.225))
     ])
@@ -41,8 +42,7 @@ def inference(model : torch.nn.Module, input_dir : str, output_dir : str):
 
         with torch.no_grad(): 
             prediction = model(img_tensor)
-        
-        prediction = torch.argmax(prediction, dim=1).squeeze(0).cpu().permute(1, 2, 0).numpy()
+        prediction = torch.argmax(prediction, dim=1).squeeze(0).cpu().numpy()
         predicted_mask_np = np.zeros((H, W, 3), dtype=np.uint8)
         for class_idx, color in idx_to_color_dict.items():
             predicted_mask_np[prediction == class_idx] = color
@@ -50,7 +50,7 @@ def inference(model : torch.nn.Module, input_dir : str, output_dir : str):
         img_np = np.array(Image.open(img).convert("RGB"))
         mask_np = np.array(Image.open(mask).convert("RGB"))
         
-        fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+        fig, ax = plt.subplots(1, 3, figsize=(10, 5))
         
         ax[0].imshow(img_np)
         ax[0].set_title("Original Image")
@@ -79,7 +79,6 @@ if __name__ == "__main__":
     args = parser.parse_args() 
     
     model = UNet(num_classes=args.num_classes)
-    model.load_state_dict(torch.load(args.model_dict))
+    model.load_state_dict(torch.load(args.model_dict, weights_only=True))
     
     inference(model, args.input_dir, args.output_dir)
-    

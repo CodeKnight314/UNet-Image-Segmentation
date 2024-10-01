@@ -41,52 +41,78 @@ class DiceLoss(nn.Module):
         return total_loss / self.num_classes
 
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=None, gamma: float = 2.0, reduction: str = "mean") -> None:
+    def __init__(self, gamma=0, alpha=None, size_average=True):
         super(FocalLoss, self).__init__()
-
-        self.alpha = alpha
         self.gamma = gamma
-        self.reduction = reduction
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+
+        logpt = F.log_softmax(input, dim=-1)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = logpt.data.exp()
+
+        if self.alpha is not None:
+            if self.alpha.type()!=input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0,target.data.view(-1))
+            logpt = logpt * at
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
+        
+class CompositeLoss(nn.Module):
+    def __init__(self, dice_weight=0.3, focal_weight=0.3, ce_weight=0.4, 
+                 dice_smoothing=1e-6, dice_num_classes=6, focal_gamma=2.0, focal_alpha=None):
+        """
+        A composite loss function combining Dice Loss, Focal Loss, and Cross Entropy Loss.
+
+        Args:
+            dice_weight: Weight for the Dice Loss component.
+            focal_weight: Weight for the Focal Loss component.
+            ce_weight: Weight for the Cross Entropy Loss component.
+            dice_smoothing: Smoothing factor for Dice Loss to avoid division by zero.
+            dice_num_classes: Number of classes for Dice Loss (for one-hot encoding).
+            focal_gamma: Focusing parameter for Focal Loss (default is 2).
+            focal_alpha: Class weights for Focal Loss (to deal with imbalanced datasets).
+        """
+        super(CompositeLoss, self).__init__()
+        self.dice_weight = dice_weight
+        self.focal_weight = focal_weight
+        self.ce_weight = ce_weight
+
+        self.dice_loss = DiceLoss(smoothing=dice_smoothing, num_classes=dice_num_classes)
+        self.focal_loss = FocalLoss(gamma=focal_gamma, alpha=focal_alpha)
+        self.ce_loss = nn.CrossEntropyLoss()
 
     def forward(self, prediction: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
         """
-        Calculates the Focal loss.
+        Calculates the composite loss as a weighted sum of Dice Loss, Focal Loss, and Cross Entropy Loss.
 
         Args:
-            prediction: Tensor of shape (batch_size, num_classes, height, width)
-            truth: Tensor of shape (batch_size, height, width)
+            prediction: The model's predicted output of shape (batch_size, num_classes, height, width).
+            truth: The ground truth segmentation mask of shape (batch_size, height, width).
 
         Returns:
-            Focal loss value.
+            The combined loss value.
         """
-        N, C, H, W = prediction.shape
+        dice_loss_value = self.dice_loss(prediction, truth)
+        focal_loss_value = self.focal_loss(prediction, truth)
+        ce_loss_value = self.ce_loss(prediction, truth)
 
-        prediction = prediction.permute(0, 2, 3, 1).contiguous().view(-1, C)
-        truth = truth.view(-1, 1)
+        total_loss = self.dice_weight * dice_loss_value + self.focal_weight * focal_loss_value + self.ce_weight * ce_loss_value
 
-        pt = prediction[range(prediction.size(0)), truth.squeeze()]
-
-        focal_factor = (1 - pt) ** self.gamma
-
-        if self.alpha is not None:
-            if isinstance(self.alpha, (list, tuple, torch.Tensor)):
-                if not isinstance(self.alpha, torch.Tensor):
-                    self.alpha = torch.tensor(
-                        self.alpha, dtype=prediction.dtype, device=prediction.device
-                    )
-                alpha_t = self.alpha[truth.squeeze()]
-                loss = -alpha_t * focal_factor * torch.log(pt)
-            else:
-                loss = -self.alpha * focal_factor * torch.log(pt)
-        else:
-            loss = -focal_factor * torch.log(pt)
-
-        if self.reduction == "mean":
-            return loss.mean()
-        elif self.reduction == "sum":
-            return loss.sum()
-        else:
-            return loss
+        return total_loss
 
 def test_loss_function():
     """

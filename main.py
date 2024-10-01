@@ -2,6 +2,7 @@ from model import UNet
 from dataset import load_dataset, DataLoader
 from utils.early_stop import EarlyStopMechanism
 from utils.log_writer import LOGWRITER
+from loss import CompositeLoss
 
 import torch
 import torch.nn as nn
@@ -115,8 +116,8 @@ def Segmentation(model: nn.Module,
         writer: The TensorBoard SummaryWriter for logging metrics.
         es_mech: The early stopping mechanism.
     """
-    criterion = nn.CrossEntropyLoss()
-    logger.write("[INFO] CrossEntropyLoss function instantiated.")
+    criterion = CompositeLoss().to(device)
+    logger.write("[INFO] Composite Loss function instantiated.")
 
     logger.write(f"[INFO] Total Epochs: {total_epochs}")
     logger.write(f"[INFO] Training Dataloader loaded with {len(train_dl)} batches.")
